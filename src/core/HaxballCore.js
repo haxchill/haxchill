@@ -70,7 +70,8 @@ class HaxballCore {
     }
 
     _sendLogin() {
-        const buf = new ByteBuffer(1 + this.token.length, ByteBuffer.LITTLE_ENDIAN);
+        const tokenByteLength = Buffer.byteLength(this.token, 'utf8');
+        const buf = new ByteBuffer(1 + tokenByteLength, ByteBuffer.LITTLE_ENDIAN);
         buf.writeUint8(0); // тип: login
         buf.writeUTF8String(this.token);
         this.ws.send(buf.flip().toBuffer());
