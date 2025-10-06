@@ -1,0 +1,19 @@
+{
+  "name": "haxchill",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haxchill/haxchill.git"
+  },
+  "author": "letkh",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/haxchill/haxchill/issues"
+  },
+  "homepage": "https://github.com/haxchill/haxchill#readme"
+}
