@@ -216,7 +216,7 @@ class HaxballCore {
 
     sendChat(message) {
         if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-        const buf = new ByteBuffer(1 + message.length, ByteBuffer.LITTLE_ENDIAN);
+        const buf = new ByteBuffer(1 + Buffer.byteLength(message, 'utf8'), ByteBuffer.LITTLE_ENDIAN);
         buf.writeUint8(16); // тип: chat
         buf.writeUTF8String(message);
         this.ws.send(buf.flip().toBuffer());
