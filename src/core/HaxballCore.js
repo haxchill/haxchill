@@ -130,7 +130,26 @@ class HaxballCore {
     }
 
     _sendRoomConfig() {
-        const buf = new ByteBuffer(100, ByteBuffer.LITTLE_ENDIAN);
+        // Calculate required buffer size
+        const nameBytes = Buffer.byteLength(this.options.name, 'utf8');
+        const stadiumBytes = Buffer.byteLength(this.options.stadium, 'utf8');
+        // ByteBuffer.writeUTF8String writes a 2-byte length prefix + string bytes
+        const totalSize = 1 // type
+            + 2 + nameBytes // name
+            + 2 + stadiumBytes // stadium
+            + 1 // maxPlayers
+            + 1 // noPlayer
+            + 1 // isPublic
+            + 1 // maxPlayersPerTeam
+            + 1 // minPlayers
+            + 1 // timeLimit
+            + 1 // scoreLimit
+            + 1 // teamsLock
+            + 1 // allowTeams
+            + 1 // allowGuests
+            + 1 // stadiumVariant
+        ;
+        const buf = new ByteBuffer(totalSize, ByteBuffer.LITTLE_ENDIAN);
         buf.writeUint8(2); // тип: room config
 
         buf.writeUTF8String(this.options.name); // имя комнаты
