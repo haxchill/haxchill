@@ -2,7 +2,7 @@ name: Deploy HaxBall Bot
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   workflow_dispatch:
 
 jobs:
@@ -32,6 +32,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /opt/haxball-bot || exit 1
             git pull origin main
             npm ci
