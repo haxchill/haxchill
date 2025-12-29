@@ -1,11 +1,7 @@
-const puppeteer = require('puppeteer');
 const config = require('../config');
-const { buildBotScript } = require('../bot/GameBot');
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
+const HeadlessConnector = require('./HeadlessConnector');
 
-// In-memory status shared with health server
 const botStatus = {
   up: false,
   roomLink: null,
@@ -34,242 +30,104 @@ function startHealthServer() {
 }
 
 async function startHeadless(db) {
-	if (!config.HEADLESS_TOKEN) {
-		throw new Error('HEADLESS_TOKEN is missing. Set HAXBALL_TOKEN or HEADLESS_TOKEN in environment or .env');
-	}
-
-	const browser = await puppeteer.launch({
-		headless: 'new',
-		args: [
-			'--no-sandbox',
-			'--disable-setuid-sandbox',
-			'--disable-gpu',
-			'--disable-web-resources',
-			'--disable-dev-shm-usage',
-			'--disable-extensions',
-			'--disable-plugins',
-			'--disable-images',
-			'--no-first-run',
-			'--single-process',
-			'--allow-running-insecure-content',
-			'--disable-web-security',
-		],
-	});
-
-	const page = await browser.newPage();
-
-  // Daily file logging setup
-  try {
-    const logDir = path.join(__dirname, '../../logs');
-    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-    const date = new Date();
-    const fname = 'haxchill-' + date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0') + '.log';
-    const logPath = path.join(logDir, fname);
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
-    page.on('console', (msg) => {
-      const text = msg.text();
-      logStream.write(text + '\n');
-    });
-  } catch (e) {
-    console.warn('[core] File logging setup failed:', e.message);
+  if (!config.HEADLESS_TOKEN) {
+    throw new Error('HEADLESS_TOKEN is missing. Set HAXBALL_TOKEN or HEADLESS_TOKEN in environment or .env');
   }
 
-  // Expose stats saver to page if DB is provided
-  if (db && typeof db.recordGame === 'function') {
-    await page.exposeFunction('saveStats', async (payload) => {
-      try {
-        db.recordGame(payload);
-      } catch (err) {
-        console.error('[core] Failed to save stats:', err.message);
-      }
-    });
-    console.log('[core] Stats bridge (saveStats) exposed to page');
-
-    // Expose stats loader
-    await page.exposeFunction('loadStats', async (playerAuth) => {
-      try {
-        return db.getPlayerStats(playerAuth);
-      } catch (err) {
-        console.error('[core] Failed to load stats:', err.message);
-        return null;
-      }
-    });
-    console.log('[core] Stats bridge (loadStats) exposed to page');
-
-    // Alias bridge
-    await page.exposeFunction('getAlias', async (playerAuth) => {
-      try {
-        return db.getAlias(playerAuth);
-      } catch (err) {
-        console.error('[core] Failed to get alias:', err.message);
-        return null;
-      }
-    });
-    await page.exposeFunction('setAlias', async (playerAuth, alias) => {
-      try {
-        db.setAlias(playerAuth, alias);
-      } catch (err) {
-        console.error('[core] Failed to set alias:', err.message);
-      }
-    });
-    console.log('[core] Alias bridge (getAlias/setAlias) exposed to page');
-  }
-
-  if (db && typeof db.ensurePlayerWithStats === 'function') {
-    await page.exposeFunction('registerPlayer', async (playerAuth, name, role) => {
-      try {
-        db.ensurePlayerWithStats(playerAuth, name, role || 'player');
-      } catch (err) {
-        console.error('[core] Failed to register player:', err.message);
-      }
-    });
-    console.log('[core] Player registration bridge exposed to page');
-  }
-
-  if (db && typeof db.getPlayerByName === 'function') {
-    await page.exposeFunction('resolveAuthForName', async (name) => {
-      try {
-        const rec = db.getPlayerByName(name);
-        return rec ? rec.player_auth : null;
-      } catch (err) {
-        console.error('[core] Failed to resolve auth for name:', err.message);
-        return null;
-      }
-    });
-    console.log('[core] Auth resolution bridge (resolveAuthForName) exposed to page');
-  }
-
-  // Enhanced console logging with detailed output
-  page.on('console', (msg) => {
-    try {
-      const args = [];
-      for (let i = 0; i < msg.args().length; ++i) {
-        args.push(msg.args()[i]);
-      }
-      const location = msg.location();
-      const logType = msg.type();
-      
-      let prefix = '[browser]';
-      if (logType === 'error') prefix = '[browser:ERROR]';
-      else if (logType === 'warning') prefix = '[browser:WARN]';
-      else if (logType === 'log') prefix = '[browser:LOG]';
-      
-      const fullMsg = prefix + ' ' + msg.text() + (location ? ' @ ' + location.url + ':' + location.lineNumber : '');
-      
-      // Always output to ensure visibility
-      if (logType === 'error') {
-        console.error(fullMsg);
-      } else if (logType === 'warning') {
-        console.warn(fullMsg);
-      } else {
-        console.log(fullMsg);
-      }
-
-      // Update status heuristics from known logs
-      if (text.includes('Script initialization complete') || text.includes('HBInit succeeded')) {
-        botStatus.up = true;
-        botStatus.lastUpdate = new Date().toISOString();
-      }
-    } catch (e) {
-      console.log('[browser]', msg.text());
-    }
+  const connector = new HeadlessConnector(config.HEADLESS_TOKEN, {
+    roomName: config.ROOM?.name || 'HaxChill Room',
+    maxPlayers: Number(config.ROOM?.maxPlayers ?? 8),
+    public: config.ROOM?.public !== false,
+    password: config.ROOM?.password || null,
   });
 
-  // Log page errors
-  page.on('error', (err) => {
-    console.error('[page:ERROR]', err);
-  });
+  console.log('[core] Connecting to Haxball Headless...');
+  await connector.connect();
 
-  await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  console.log('[core] Room initialized. Link:', connector.roomLink);
+  botStatus.up = true;
+  botStatus.roomLink = connector.roomLink;
 
-  // Log page request/response for debugging
-  page.on('response', (response) => {
-    if (response.url().includes('headless')) {
-      console.log('[page:RESPONSE]', response.status(), response.url());
-    }
-  });
+  connector.setDefaultStadium('Big');
+  connector.setScoreLimit(5);
+  connector.setTimeLimit(0);
 
-  console.log('[core] Navigating to Haxball Headless...');
-  await page.goto('https://www.haxball.com/headless', { waitUntil: 'domcontentloaded' });
-  
-  await page.evaluateOnNewDocument(() => {
-    window.RTCPeerConnection = new Proxy(window.RTCPeerConnection || (() => {}), {
-      construct: (target, args) => {
-        const config = args[0] || {};
-        config.iceServers = [
-          { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
-          { urls: ['stun:stun3.l.google.com:19302', 'stun:stun4.l.google.com:19302'] },
-          { urls: ['stun:stun.nextcloud.com:443'] },
-          { 
-            urls: ['turn:numb.viagee.com:3478?transport=udp', 'turn:numb.viagee.com:3478?transport=tcp'],
-            username: 'webrtc',
-            credential: 'webrtc'
-          }
-        ];
-        return Reflect.construct(target, [config]);
-      }
-    });
-  });
-  
-  console.log('[core] Page loaded, waiting for HBInit...');
+  connector.callbacks.onRoomLink = (link) => {
+    console.log('[core] Room link:', link);
+    botStatus.roomLink = link;
+  };
 
-  // Wait until HBInit is available on the page (headless host loaded)
-  try {
-    await page.waitForFunction(() => typeof window.HBInit === 'function', { timeout: 30000 });
-    console.log('[core] HBInit found, injecting bot script...');
-  } catch (err) {
-    console.error('[core] Timeout waiting for HBInit:', err.message);
-    await browser.close();
-    throw err;
-  }
+  connector.callbacks.onPlayerJoin = (player) => {
+    console.log('[core] Player joined:', player.name);
+    botStatus.players = connector.getPlayerList().length;
+  };
 
-  const botScript = buildBotScript(config, db);
+  connector.callbacks.onPlayerLeave = (player) => {
+    console.log('[core] Player left:', player.name);
+    botStatus.players = connector.getPlayerList().length;
+  };
 
-  const scriptPath = path.join(process.cwd(), '.debug-bot-script.js');
-  fs.writeFileSync(scriptPath, botScript, 'utf8');
-  console.log('[core] Generated bot script saved to:', scriptPath);
-  console.log('[core] Script length:', botScript.length, 'characters');
+  connector.callbacks.onGameStart = (byPlayer) => {
+    console.log('[core] Game started');
+    botStatus.inProgress = true;
+  };
 
-  // Quick syntax check
-  try {
-    new Function(botScript);
-    console.log('[core] Bot script syntax is valid');
-  } catch (syntaxErr) {
-    console.error('[core] SYNTAX ERROR in generated bot script:', syntaxErr.message);
-    console.error('[core] Check the saved script at:', scriptPath);
-    await browser.close();
-    throw syntaxErr;
-  }
+  connector.callbacks.onGameStop = () => {
+    console.log('[core] Game stopped');
+    botStatus.inProgress = false;
+  };
 
-  // Inject and run the bot script in page context
-  try {
-    await page.addScriptTag({ content: botScript });
-    console.log('[core] Bot script injected successfully');
-  } catch (err) {
-    console.error('[core] Failed to inject bot script:', err);
-    await browser.close();
-    throw err;
-  }
-
-  // Expose status reporting bridge to browser
-  await page.exposeFunction('reportStatus', async (payload) => {
-    try {
-      if (payload && typeof payload === 'object') {
-        Object.assign(botStatus, payload);
-        botStatus.lastUpdate = new Date().toISOString();
-      }
-    } catch (err) {
-      console.error('[core] Failed to update status:', err.message);
-    }
-  });
-  // Start health server once
-  if (!startHeadless.healthStarted) {
-    startHealthServer();
-    startHeadless.healthStarted = true;
-  }
-
-  console.log('[core] Haxball headless host initialized successfully');
-  return { browser, page };
+  return { connector };
 }
 
-module.exports = { startHeadless };
+async function runWithAutoRestart(db) {
+  let restartCount = 0;
+  const maxRestarts = 5;
+  const restartDelay = 5000;
+
+  while (restartCount < maxRestarts) {
+    try {
+      console.log('[core] Starting bot instance...');
+      const { connector } = await startHeadless(db);
+      restartCount = 0;
+      console.log('[core] Bot running successfully');
+
+      await new Promise(resolve => {
+        setTimeout(resolve, 3600000);
+      });
+
+    } catch (err) {
+      restartCount++;
+      console.error(`[core] Error (attempt ${restartCount}/${maxRestarts}):`, err.message);
+      
+      if (restartCount < maxRestarts) {
+        console.log(`[core] Restarting in ${restartDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, restartDelay));
+      }
+    }
+  }
+
+  console.error('[core] Max restart attempts reached. Exiting.');
+  process.exit(1);
+}
+
+async function main() {
+  try {
+    require('dotenv').config();
+    const Database = require('./Database');
+    const db = new Database();
+    
+    startHealthServer();
+
+    await runWithAutoRestart(db);
+  } catch (err) {
+    console.error('[core] Fatal error:', err.message);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { startHeadless, main };
