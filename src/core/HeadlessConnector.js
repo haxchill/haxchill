@@ -38,12 +38,24 @@ class HeadlessConnector {
   async connect() {
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket('wss://www.haxball.com/headless');
+        // Prepare WebSocket URL with token
+        const wsUrl = `wss://www.haxball.com/headless?token=${encodeURIComponent(this.token)}`;
+        
+        console.log('[headless] Connecting to Haxball Headless API...');
+        
+        // Connect with proper origin header (required by Haxball)
+        this.ws = new WebSocket(wsUrl, {
+          headers: {
+            origin: 'https://html5.haxball.com'
+          }
+        });
+        
+        this.ws.binaryType = 'arraybuffer';
         
         this.ws.on('open', () => {
-          console.log('[headless] WebSocket connected, sending auth...');
+          console.log('[headless] WebSocket connected to Haxball Headless');
           this.connected = true;
-          this.sendAuth();
+          this.createRoom();
         });
 
         this.ws.on('message', (data) => {
@@ -81,15 +93,6 @@ class HeadlessConnector {
     });
   }
 
-  sendAuth() {
-    const authMsg = {
-      c: 0,
-      auth: this.token,
-    };
-    console.log('[headless] Sending auth message...');
-    this.send(authMsg);
-  }
-
   send(obj) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(obj));
@@ -102,9 +105,6 @@ class HeadlessConnector {
       const type = msg.c;
 
       switch (type) {
-        case 0:
-          this.handleAuth(msg);
-          break;
         case 1:
           this.handleRoomInit(msg);
           break;
@@ -138,17 +138,6 @@ class HeadlessConnector {
     } catch (err) {
       console.error('[headless] Error handling message:', err.message);
     }
-  }
-
-  handleAuth(msg) {
-    console.log('[headless] Auth response received:', JSON.stringify(msg));
-    if (msg.success === false) {
-      console.error('[headless] Auth failed:', msg.error);
-      throw new Error('Auth failed: ' + (msg.error || 'unknown error'));
-    }
-    console.log('[headless] Auth successful, creating room...');
-    this.connected = true;
-    this.createRoom();
   }
 
   createRoom() {
