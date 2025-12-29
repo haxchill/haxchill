@@ -58,10 +58,13 @@ class HeadlessConnector {
         res.on('data', (chunk) => { data += chunk; });
         res.on('end', () => {
           try {
+            console.log('[headless] API Response status:', res.statusCode);
+            console.log('[headless] API Response (first 200 chars):', data.substring(0, 200));
             const response = JSON.parse(data);
             console.log('[headless] Got host info:', { url: response.url ? 'present' : 'missing' });
             resolve(response);
           } catch (err) {
+            console.error('[headless] Parse error. Raw response:', data.substring(0, 500));
             reject(new Error('Failed to parse host info response: ' + err.message));
           }
         });
