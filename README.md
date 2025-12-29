@@ -1,2 +1,1 @@
 # 🎮 HaxChill
-> Coming soon

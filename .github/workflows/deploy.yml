@@ -30,10 +30,10 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           script: |
             set -e
-            cd /opt/haxball-bot || exit 1
+            cd /opt/haxball-bot || { git clone https://github.com/${{ github.repository }} /opt/haxball-bot && cd /opt/haxball-bot; }
             git pull origin main
             npm ci
             pm2 reload haxball-bot || pm2 start index.js --name "haxball-bot"
