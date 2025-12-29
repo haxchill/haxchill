@@ -34,6 +34,7 @@ jobs:
           script: |
             set -e
             cd /opt/haxball-bot || { git clone https://github.com/${{ github.repository }} /opt/haxball-bot && cd /opt/haxball-bot; }
-            git pull origin ${{ github.ref_name }}
+            git fetch origin ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
             npm ci
             pm2 reload haxball-bot || pm2 start index.js --name "haxball-bot"
