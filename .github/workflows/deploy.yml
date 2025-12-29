@@ -20,7 +20,7 @@ jobs:
           cache: 'npm'
 
       - name: 🧪 Install dependencies
-        run: npm ci
+        run: npm install
 
       # - name: 🧪 Run tests
       #   run: npm test
@@ -36,5 +36,5 @@ jobs:
             cd /opt/haxball-bot || { git clone https://github.com/${{ github.repository }} /opt/haxball-bot && cd /opt/haxball-bot; }
             git fetch origin ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
-            npm ci
+            npm install
             pm2 reload haxball-bot || pm2 start index.js --name "haxball-bot"
