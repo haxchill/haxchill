@@ -1,6 +1,7 @@
 const config = require('../config');
 const express = require('express');
-const HaxballJS = require('haxball.js');
+// haxball.js default-exports the factory function
+const HaxballJS = require('haxball.js').default;
 
 const botStatus = {
   up: false,
