@@ -44,6 +44,13 @@ async function startHeadless(db) {
 			'--no-sandbox',
 			'--disable-setuid-sandbox',
 			'--disable-gpu',
+			'--disable-web-resources',
+			'--disable-dev-shm-usage',
+			'--disable-extensions',
+			'--disable-plugins',
+			'--disable-images',
+			'--no-first-run',
+			'--single-process',
 		],
 	});
 
@@ -170,6 +177,8 @@ async function startHeadless(db) {
   page.on('error', (err) => {
     console.error('[page:ERROR]', err);
   });
+
+  await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
   // Log page request/response for debugging
   page.on('response', (response) => {
