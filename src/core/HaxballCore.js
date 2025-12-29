@@ -197,9 +197,14 @@ async function startHeadless(db) {
       construct: (target, args) => {
         const config = args[0] || {};
         config.iceServers = [
-          { urls: ['stun:stun.l.google.com:19302'] },
-          { urls: ['stun:stun1.l.google.com:19302'] },
-          { urls: ['stun:stun2.l.google.com:19302'] },
+          { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+          { urls: ['stun:stun3.l.google.com:19302', 'stun:stun4.l.google.com:19302'] },
+          { urls: ['stun:stun.nextcloud.com:443'] },
+          { 
+            urls: ['turn:numb.viagee.com:3478?transport=udp', 'turn:numb.viagee.com:3478?transport=tcp'],
+            username: 'webrtc',
+            credential: 'webrtc'
+          }
         ];
         return Reflect.construct(target, [config]);
       }
