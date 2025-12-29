@@ -194,9 +194,7 @@ async function startHeadless(db) {
 
   const botScript = buildBotScript(config, db);
 
-  // Save generated script for debugging
-  const fs = require('fs');
-  const scriptPath = 'c:/Users/letkh/Documents/GitHub/haxchill/.debug-bot-script.js';
+  const scriptPath = path.join(process.cwd(), '.debug-bot-script.js');
   fs.writeFileSync(scriptPath, botScript, 'utf8');
   console.log('[core] Generated bot script saved to:', scriptPath);
   console.log('[core] Script length:', botScript.length, 'characters');
