@@ -41,7 +41,8 @@ class HeadlessConnector {
         this.ws = new WebSocket('wss://www.haxball.com/headless');
         
         this.ws.on('open', () => {
-          console.log('[headless] WebSocket connected');
+          console.log('[headless] WebSocket connected, sending auth...');
+          this.connected = true;
           this.sendAuth();
         });
 
@@ -51,6 +52,7 @@ class HeadlessConnector {
 
         this.ws.on('error', (err) => {
           console.error('[headless] WebSocket error:', err.message);
+          console.error('[headless] Error details:', err);
           reject(err);
         });
 
@@ -82,9 +84,9 @@ class HeadlessConnector {
   sendAuth() {
     const authMsg = {
       c: 0,
-      token: this.token,
-      version: 4,
+      auth: this.token,
     };
+    console.log('[headless] Sending auth message...');
     this.send(authMsg);
   }
 
@@ -139,7 +141,12 @@ class HeadlessConnector {
   }
 
   handleAuth(msg) {
-    console.log('[headless] Auth successful');
+    console.log('[headless] Auth response received:', JSON.stringify(msg));
+    if (msg.success === false) {
+      console.error('[headless] Auth failed:', msg.error);
+      throw new Error('Auth failed: ' + (msg.error || 'unknown error'));
+    }
+    console.log('[headless] Auth successful, creating room...');
     this.connected = true;
     this.createRoom();
   }
