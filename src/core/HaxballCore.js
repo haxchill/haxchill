@@ -114,8 +114,15 @@ async function runWithAutoRestart(db) {
 async function main() {
   try {
     require('dotenv').config();
-    const Database = require('./Database');
-    const db = new Database();
+    
+    let db = null;
+    try {
+      const Database = require('./Database');
+      db = new Database();
+      console.log('[core] Database initialized');
+    } catch (err) {
+      console.warn('[core] Database not available (optional):', err.message);
+    }
     
     startHealthServer();
 
