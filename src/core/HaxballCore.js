@@ -51,6 +51,8 @@ async function startHeadless(db) {
 			'--disable-images',
 			'--no-first-run',
 			'--single-process',
+			'--allow-running-insecure-content',
+			'--disable-web-security',
 		],
 	});
 
@@ -189,6 +191,21 @@ async function startHeadless(db) {
 
   console.log('[core] Navigating to Haxball Headless...');
   await page.goto('https://www.haxball.com/headless', { waitUntil: 'domcontentloaded' });
+  
+  await page.evaluateOnNewDocument(() => {
+    window.RTCPeerConnection = new Proxy(window.RTCPeerConnection || (() => {}), {
+      construct: (target, args) => {
+        const config = args[0] || {};
+        config.iceServers = [
+          { urls: ['stun:stun.l.google.com:19302'] },
+          { urls: ['stun:stun1.l.google.com:19302'] },
+          { urls: ['stun:stun2.l.google.com:19302'] },
+        ];
+        return Reflect.construct(target, [config]);
+      }
+    });
+  });
+  
   console.log('[core] Page loaded, waiting for HBInit...');
 
   // Wait until HBInit is available on the page (headless host loaded)
