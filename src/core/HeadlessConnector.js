@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const config = require('../config');
+const https = require('https');
 
 class HeadlessConnector {
   constructor(token, options = {}) {
@@ -35,61 +36,102 @@ class HeadlessConnector {
     };
   }
 
+  async requestHostInfo() {
+    return new Promise((resolve, reject) => {
+      console.log('[headless] Requesting host info from API...');
+      
+      const postData = `token=${encodeURIComponent(this.token)}`;
+      
+      const options = {
+        hostname: 'www.haxball.com',
+        port: 443,
+        path: '/api/host',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData),
+        }
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data);
+            console.log('[headless] Got host info:', { url: response.url ? 'present' : 'missing' });
+            resolve(response);
+          } catch (err) {
+            reject(new Error('Failed to parse host info response: ' + err.message));
+          }
+        });
+      });
+      
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+  }
+
   async connect() {
     return new Promise((resolve, reject) => {
-      try {
-        // Prepare WebSocket URL with token
-        const wsUrl = `wss://www.haxball.com/headless?token=${encodeURIComponent(this.token)}`;
+      this.requestHostInfo().then(hostInfo => {
+        if (!hostInfo.url || !hostInfo.token) {
+          reject(new Error('Invalid host info response: missing url or token'));
+          return;
+        }
         
-        console.log('[headless] Connecting to Haxball Headless API...');
+        const wsUrl = hostInfo.url + '?token=' + encodeURIComponent(hostInfo.token);
         
-        // Connect with proper origin header (required by Haxball)
-        this.ws = new WebSocket(wsUrl, {
-          headers: {
-            origin: 'https://html5.haxball.com'
-          }
-        });
+        console.log('[headless] Connecting to WebSocket at:', hostInfo.url.split('/').slice(0, 3).join('/') + '...');
         
-        this.ws.binaryType = 'arraybuffer';
-        
-        this.ws.on('open', () => {
-          console.log('[headless] WebSocket connected to Haxball Headless');
-          this.connected = true;
-          this.createRoom();
-        });
+        try {
+          // Connect with proper origin header (required by Haxball)
+          this.ws = new WebSocket(wsUrl, {
+            headers: {
+              origin: 'https://html5.haxball.com'
+            }
+          });
+          
+          this.ws.binaryType = 'arraybuffer';
+          
+          this.ws.on('open', () => {
+            console.log('[headless] WebSocket connected to Haxball Headless');
+            this.connected = true;
+            this.createRoom();
+          });
 
-        this.ws.on('message', (data) => {
-          this.handleMessage(data);
-        });
+          this.ws.on('message', (data) => {
+            this.handleMessage(data);
+          });
 
-        this.ws.on('error', (err) => {
-          console.error('[headless] WebSocket error:', err.message);
-          console.error('[headless] Error details:', err);
+          this.ws.on('error', (err) => {
+            console.error('[headless] WebSocket error:', err.message);
+            reject(err);
+          });
+
+          this.ws.on('close', () => {
+            console.log('[headless] WebSocket closed');
+            this.connected = false;
+            this.initialized = false;
+          });
+
+          // Timeout для подключения
+          const timeout = setTimeout(() => {
+            reject(new Error('WebSocket connection timeout'));
+          }, 30000);
+
+          const checkInit = setInterval(() => {
+            if (this.initialized) {
+              clearInterval(checkInit);
+              clearTimeout(timeout);
+              resolve(this);
+            }
+          }, 100);
+        } catch (err) {
           reject(err);
-        });
-
-        this.ws.on('close', () => {
-          console.log('[headless] WebSocket closed');
-          this.connected = false;
-          this.initialized = false;
-        });
-
-        // Timeout для подключения
-        const timeout = setTimeout(() => {
-          reject(new Error('Connection timeout'));
-        }, 30000);
-
-        const checkInit = setInterval(() => {
-          if (this.initialized) {
-            clearInterval(checkInit);
-            clearTimeout(timeout);
-            resolve(this);
-          }
-        }, 100);
-
-      } catch (err) {
-        reject(err);
-      }
+        }
+      }).catch(reject);
     });
   }
 
