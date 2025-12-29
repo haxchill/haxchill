@@ -17,12 +17,13 @@ const onGameStart = require('./events/onGameStart');
 const onPlayerBallKick = require('./events/onPlayerBallKick');
 const onPositionsReset = require('./events/onPositionsReset');
 
+const fs = require('fs');
+const path = require('path');
+
 const GameState = require('./lib/GameState');
 const CaptainDraft = require('./lib/CaptainDraft');
 const Logger = require('./lib/Logger');
 const AutoManagerSrcPath = path.join(__dirname, 'lib/AutoManager.js');
-const fs = require('fs');
-const path = require('path');
 
 function buildBotScript(config, db) {
   const { ROOM, HEADLESS_TOKEN } = config;
