@@ -1,13 +1,11 @@
 const config = require('../config');
 const express = require('express');
-const HeadlessConnector = require('./HeadlessConnector');
+const HaxballJS = require('haxball.js');
 
 const botStatus = {
   up: false,
   roomLink: null,
   players: 0,
-  size: null,
-  draft: false,
   inProgress: false,
   lastUpdate: null,
 };
@@ -31,53 +29,54 @@ function startHealthServer() {
 
 async function startHeadless(db) {
   if (!config.HEADLESS_TOKEN) {
-    throw new Error('HEADLESS_TOKEN is missing. Set HAXBALL_TOKEN or HEADLESS_TOKEN in environment or .env');
+    throw new Error('HEADLESS_TOKEN is missing');
   }
 
-  const connector = new HeadlessConnector(config.HEADLESS_TOKEN, {
+  console.log('[core] Initializing HaxballJS...');
+  const HBInit = await HaxballJS();
+  
+  console.log('[core] Creating room...');
+  const room = HBInit({
     roomName: config.ROOM?.name || 'HaxChill Room',
     maxPlayers: Number(config.ROOM?.maxPlayers ?? 8),
     public: config.ROOM?.public !== false,
     password: config.ROOM?.password || null,
+    noPlayer: true,
+    token: config.HEADLESS_TOKEN,
   });
 
-  console.log('[core] Connecting to Haxball Headless...');
-  await connector.connect();
+  room.setDefaultStadium('Big');
+  room.setScoreLimit(5);
+  room.setTimeLimit(0);
 
-  console.log('[core] Room initialized. Link:', connector.roomLink);
-  botStatus.up = true;
-  botStatus.roomLink = connector.roomLink;
-
-  connector.setDefaultStadium('Big');
-  connector.setScoreLimit(5);
-  connector.setTimeLimit(0);
-
-  connector.callbacks.onRoomLink = (link) => {
+  room.onRoomLink = (link) => {
     console.log('[core] Room link:', link);
+    botStatus.up = true;
     botStatus.roomLink = link;
+    botStatus.lastUpdate = new Date().toISOString();
   };
 
-  connector.callbacks.onPlayerJoin = (player) => {
+  room.onPlayerJoin = (player) => {
     console.log('[core] Player joined:', player.name);
-    botStatus.players = connector.getPlayerList().length;
+    botStatus.players = room.getPlayerList().length;
   };
 
-  connector.callbacks.onPlayerLeave = (player) => {
+  room.onPlayerLeave = (player) => {
     console.log('[core] Player left:', player.name);
-    botStatus.players = connector.getPlayerList().length;
+    botStatus.players = room.getPlayerList().length;
   };
 
-  connector.callbacks.onGameStart = (byPlayer) => {
+  room.onGameStart = () => {
     console.log('[core] Game started');
     botStatus.inProgress = true;
   };
 
-  connector.callbacks.onGameStop = () => {
+  room.onGameStop = () => {
     console.log('[core] Game stopped');
     botStatus.inProgress = false;
   };
 
-  return { connector };
+  return { room };
 }
 
 async function runWithAutoRestart(db) {
@@ -88,13 +87,11 @@ async function runWithAutoRestart(db) {
   while (restartCount < maxRestarts) {
     try {
       console.log('[core] Starting bot instance...');
-      const { connector } = await startHeadless(db);
+      const { room } = await startHeadless(db);
       restartCount = 0;
       console.log('[core] Bot running successfully');
 
-      await new Promise(resolve => {
-        setTimeout(resolve, 3600000);
-      });
+      await new Promise(() => {});
 
     } catch (err) {
       restartCount++;
