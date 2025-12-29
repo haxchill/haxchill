@@ -1,0 +1,25 @@
+{
+  "name": "haxchill",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haxchill/haxchill.git"
+  },
+  "author": "letkh",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/haxchill/haxchill/issues"
+  },
+  "homepage": "https://github.com/haxchill/haxchill#readme",
+  "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "dotenv": "^16.4.5",
+    "puppeteer": "^23.8.0"
+  }
+}
