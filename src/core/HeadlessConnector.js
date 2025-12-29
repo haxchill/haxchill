@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
+const XMLHttpRequest = require('xhr2');
 const config = require('../config');
-const https = require('https');
 
 class HeadlessConnector {
   constructor(token, options = {}) {
@@ -38,41 +38,38 @@ class HeadlessConnector {
 
   async requestHostInfo() {
     return new Promise((resolve, reject) => {
-      console.log('[headless] Requesting host info from API...');
+      console.log('[headless] Requesting host info from Haxball API...');
       
+      const xhr = new XMLHttpRequest();
+      const url = 'https://www.haxball.com/api/host';
       const postData = `token=${encodeURIComponent(this.token)}`;
       
-      const options = {
-        hostname: 'www.haxball.com',
-        port: 443,
-        path: '/api/host',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Content-Length': Buffer.byteLength(postData),
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      
+      xhr.onload = () => {
+        try {
+          console.log('[headless] API Response status:', xhr.status);
+          if (xhr.status !== 200) {
+            console.error('[headless] API Error:', xhr.status, xhr.statusText);
+            throw new Error(`API returned ${xhr.status}: ${xhr.statusText}`);
+          }
+          
+          const response = JSON.parse(xhr.responseText);
+          console.log('[headless] Got host info successfully');
+          resolve(response);
+        } catch (err) {
+          console.error('[headless] Parse error:', err.message);
+          console.error('[headless] Response text (first 300 chars):', xhr.responseText.substring(0, 300));
+          reject(err);
         }
       };
       
-      const req = https.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-          try {
-            console.log('[headless] API Response status:', res.statusCode);
-            console.log('[headless] API Response (first 200 chars):', data.substring(0, 200));
-            const response = JSON.parse(data);
-            console.log('[headless] Got host info:', { url: response.url ? 'present' : 'missing' });
-            resolve(response);
-          } catch (err) {
-            console.error('[headless] Parse error. Raw response:', data.substring(0, 500));
-            reject(new Error('Failed to parse host info response: ' + err.message));
-          }
-        });
-      });
+      xhr.onerror = () => {
+        reject(new Error(`XHR error: ${xhr.status}`));
+      };
       
-      req.on('error', reject);
-      req.write(postData);
-      req.end();
+      xhr.send(postData);
     });
   }
 
